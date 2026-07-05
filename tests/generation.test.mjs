@@ -64,7 +64,7 @@ function startFakeServers() {
         res.writeHead(200, { "content-type": "application/json" });
         // Streamed JSON chunks, newline-separated, base64 audio + end marker.
         res.write(`${JSON.stringify({ code: 0, data: Buffer.from("AUD").toString("base64") })}\n`);
-        if (parsed.audio_params?.enable_timestamp) {
+        if (parsed.req_params?.audio_params?.enable_timestamp) {
           res.write(`${JSON.stringify({ code: 0, data: Buffer.from("IO!").toString("base64"), words: [{ word: "hello", start: 0, end: 0.4 }] })}\n`);
         } else {
           res.write(`${JSON.stringify({ code: 0, data: Buffer.from("IO!").toString("base64") })}\n`);
@@ -219,7 +219,7 @@ test("tts: streamed chunks concatenate; mp3 written; headers carry the fixed app
     const req = state.requests.find((r) => r.url.endsWith("/tts/unidirectional"));
     assert.equal(req.headers["x-api-key"], "voice-key");
     assert.equal(req.headers["x-api-app-key"], "aGjiRDfUWi");
-    assert.equal(req.body.speaker, "en_male_tim_uranus_bigtts");
+    assert.equal(req.body.req_params.speaker, "en_male_tim_uranus_bigtts");
   } finally {
     close();
   }
@@ -237,8 +237,8 @@ test("tts: --format wav wraps pcm in a RIFF header; --tone rides as context_text
     assert.equal(wav.subarray(8, 12).toString(), "WAVE");
     assert.equal(wav.subarray(44).toString(), "AUDIO!");
     const req = state.requests.find((r) => r.url.endsWith("/tts/unidirectional"));
-    assert.deepEqual(req.body.context_texts, ["warm, reassuring"]);
-    assert.equal(req.body.audio_params.format, "pcm");
+    assert.deepEqual(JSON.parse(req.body.req_params.additions).context_texts, ["warm, reassuring"]);
+    assert.equal(req.body.req_params.audio_params.format, "pcm");
   } finally {
     close();
   }

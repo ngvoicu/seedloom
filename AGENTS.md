@@ -43,7 +43,7 @@ This guide is kept **byte-identical** in `AGENTS.md` and `CLAUDE.md` (a parity t
 - **Tests never call live BytePlus APIs** (real calls bill real money): temp `SEEDLOOM_HOME`, credential env stripped, and — once the API core lands — local fake HTTP servers. The ConsensFlow discipline.
 - **No reachable stubs.** The surface is `video | tts | image | qa | status | doctor | models | config` (plus `help`); `voices`/`clone` stay unregistered until they work end to end.
 - **Tests spawn the CLI asynchronously** (`spawn`, never `spawnSync`) when fake servers live in the test process — a blocking spawn freezes the event loop the fakes answer from and deadlocks the suite.
-- Three medium-confidence API details are flagged "verify live" in code comments (video param placement, the QA video content part, the TTS timestamp schema) — confirm them on the first billed call and delete the comments.
+- Two medium-confidence API details remain flagged "verify live" in code comments (video param placement, the QA video content part) — confirm on the first billed Ark call and delete the comments. The TTS body shape was live-verified 2026-07-05 (it nests under `req_params`; `additions` is a JSON-encoded string carrying `context_texts`).
 - The bin's main-module guard realpaths `process.argv[1]` — global npm installs invoke it through a symlink; don't "simplify" that check back to a plain equality.
 
 ## Conventions (enforced)
