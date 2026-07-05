@@ -313,6 +313,12 @@ test("image: b64 payload written as png with model from config", async () => {
     const req = state.requests.find((r) => r.url.endsWith("/images/generations"));
     assert.equal(req.body.model, "seedream-4-5-251128");
     assert.equal(req.body.response_format, "b64_json");
+    assert.equal(req.body.watermark, false, "watermark must default off — the platform badges images otherwise");
+
+    const branded = await runCli(["image", "poster", "--watermark", "--json"], { home, env: { ARK_API_KEY: "k" } });
+    assert.equal(branded.status, 0, branded.stderr);
+    const req2 = state.requests.filter((r) => r.url.endsWith("/images/generations")).at(-1);
+    assert.equal(req2.body.watermark, true);
   } finally {
     close();
   }

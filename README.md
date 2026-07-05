@@ -8,7 +8,7 @@ Generate **video, voice, and images** from your coding agent — Seedance video 
 
 One repo, two surfaces: a **zero-dependency Node CLI** over ByteDance's Seed model family on **BytePlus ModelArk** (the international platform), and the **universal skill** (`SKILL.md`) that teaches Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI — or any tool that reads SKILL.md files — how to drive it.
 
-> **Status: v0.2.** The generation core is implemented: `video`, `tts`, `image`, and `qa` work end to end against the verified API shapes, with a fully offline test suite (fake BytePlus servers). `tts` is live-verified (2026-07-05), including `wav` output and native word timestamps; the Ark commands additionally need their models activated in the console (setup step below). `voices`/`clone` subcommands are deliberately absent — cloned voices already work via `tts --voice S_<cloneId>`; slot ordering happens in the console.
+> **Status: v0.2.** `tts`, `image`, and `qa` are **live-verified** (2026-07-05) — real narration with native word timestamps, real Seedream stills, real seed-1.8 clip reviews. `video` is implemented and offline-tested against the verified API shapes; it awaits a first live call because BytePlus gates the Seedance series behind a resource-pack purchase (see setup). `voices`/`clone` subcommands are deliberately absent — cloned voices already work via `tts --voice S_<cloneId>`; slot ordering happens in the console.
 
 ## Install — one command
 
@@ -42,7 +42,7 @@ Only making narration? You need just the voice key. Only generating clips and st
 
 1. Sign up at the [BytePlus console](https://console.byteplus.com) — self-serve for individuals (~195 countries, credit card, personal verification).
 2. Open **ModelArk** → **API keys** → create a key.
-3. Activate each model you'll use (**ModelArk → Model Square**): the Seedance video models, Seedream for images, seed-1.8 for QA. An un-activated model fails with `ModelNotOpen` naming the exact model id.
+3. Activate each model you'll use (**ModelArk → Model Square**, "one-click authorization"): Seedream (images) and seed-1.8 (QA) activate free — pay-as-you-go, free quota consumed first. The **Seedance video series is the exception**: BytePlus requires purchasing a per-model resource pack (min 7M tokens, ≈$30 for standard, 90-day validity) or going through their contact form. An un-activated model fails with `ModelNotOpen` naming the exact model id.
 4. `export ARK_API_KEY=…` (shell profile, direnv, or your secret manager).
 
 **Getting `BYTEPLUS_VOICE_API_KEY`** (TTS / cloning):
@@ -73,7 +73,7 @@ seedloom video "a paper boat sails a rain gutter" [--image first.png] [--last-im
 seedloom tts "Welcome back. Today we ship." [--voice en_male_tim_uranus_bigtts | S_<cloneId>]
              [--tone "warm, reassuring"] [--format mp3|wav] [--sample-rate 24000] [--words] [--json]
 
-seedloom image "isometric server room, dusk palette" [--model <id>] [--size 2048x2048] [--json]
+seedloom image "isometric server room, dusk palette" [--model <id>] [--size 2560x1440] [--watermark] [--json]
 seedloom qa clip.mp4 "the prompt it came from" [--model <id>] [--json]   # seed-1.8 reviews the clip
 ```
 
@@ -132,6 +132,7 @@ Seedloom produces exactly what a HyperFrames composition consumes — no adapter
 - **Concurrency:** individual accounts run 3 video tasks at once (1 for 4K); ~2 QPS.
 - **Premium TTS 2.0 voices return no native word timestamps** — derive them externally (e.g. `npx hyperframes transcribe`, the same approach HyperFrames uses for ElevenLabs). TTS 1.0/ICL voices return them natively via `--words`.
 - **Costs are token-based for video**: a 5s 1080p clip ≈ $1.06 standard; draft on fast/mini, finalize on standard.
+- **Seedream images need ≥3,686,400 pixels** (2560×1440-equivalent) — smaller `--size` values are rejected with `InvalidParameter`. The platform stamps an "AI generated" badge by default; Seedloom turns it off (`--watermark` re-enables it).
 
 ## Configuration
 
