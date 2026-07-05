@@ -64,8 +64,23 @@ function startFakeServers() {
         res.writeHead(200, { "content-type": "application/json" });
         // Streamed JSON chunks, newline-separated, base64 audio + end marker.
         res.write(`${JSON.stringify({ code: 0, data: Buffer.from("AUD").toString("base64") })}\n`);
-        if (parsed.req_params?.audio_params?.enable_timestamp) {
-          res.write(`${JSON.stringify({ code: 0, data: Buffer.from("IO!").toString("base64"), words: [{ word: "hello", start: 0, end: 0.4 }] })}\n`);
+        // Live-verified 2026-07-05: timestamps ride a `sentence` field on an audio chunk,
+        // and only TTS 1.0/ICL voices produce them (2.0 voices ignore enable_timestamp).
+        if (parsed.req_params?.audio_params?.enable_timestamp && /_emo_v2_mars_|^S_/.test(parsed.req_params.speaker)) {
+          res.write(
+            `${JSON.stringify({
+              code: 0,
+              data: Buffer.from("IO!").toString("base64"),
+              sentence: {
+                phonemes: [],
+                text: "hello world",
+                words: [
+                  { word: "hello", startTime: 0.345, endTime: 0.955, confidence: 0.88 },
+                  { word: "world", startTime: 1.015, endTime: 1.865, confidence: 0.79 },
+                ],
+              },
+            })}\n`,
+          );
         } else {
           res.write(`${JSON.stringify({ code: 0, data: Buffer.from("IO!").toString("base64") })}\n`);
         }
@@ -258,16 +273,30 @@ test("tts: cloned S_ voice routes to the ICL resource id", async () => {
   }
 });
 
-test("tts: --words captures raw timestamps when the voice provides them, and notes when it can't", async () => {
+test("tts: --words normalizes sentence timestamps to narration.words.json, and notes when the voice can't", async () => {
   const { state, close } = await startFakeServers();
   try {
     const home = makeHome(state);
-    // 1.0 emotional voice → fake returns a words payload → raw file preserved
+    // 1.0 emotional voice → sentence chunk → normalized flat [{id,text,start,end}]
     const withTs = await runCli(["tts", "hi", "--voice", "candice_emo_v2_mars_bigtts", "--words", "--json"], { home, env: { BYTEPLUS_VOICE_API_KEY: "k" } });
     assert.equal(withTs.status, 0, withTs.stderr);
     const out = JSON.parse(withTs.stdout);
-    assert.ok(out.files.words && existsSync(out.files.words));
-    assert.match(readFileSync(out.files.words, "utf8"), /hello/);
+    assert.ok(out.files.words?.endsWith("narration.words.json"), `unexpected words path: ${out.files.words}`);
+    assert.ok(existsSync(out.files.words));
+    const words = JSON.parse(readFileSync(out.files.words, "utf8"));
+    assert.deepEqual(words, [
+      { id: 0, text: "hello", start: 0.345, end: 0.955 },
+      { id: 1, text: "world", start: 1.015, end: 1.865 },
+    ]);
+    const req = state.requests.find((r) => r.url.endsWith("/tts/unidirectional"));
+    assert.equal(req.body.req_params.audio_params.enable_timestamp, true);
+
+    // 2.0 voice → no sentence payloads → no file, actionable note instead
+    const without = await runCli(["tts", "hi", "--words", "--json"], { home, env: { BYTEPLUS_VOICE_API_KEY: "k" } });
+    assert.equal(without.status, 0, without.stderr);
+    const out2 = JSON.parse(without.stdout);
+    assert.equal(out2.files.words, null);
+    assert.match(out2.wordsNote, /only TTS 1\.0\/ICL voices/);
   } finally {
     close();
   }

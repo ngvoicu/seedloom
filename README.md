@@ -8,7 +8,7 @@ Generate **video, voice, and images** from your coding agent — Seedance video 
 
 One repo, two surfaces: a **zero-dependency Node CLI** over ByteDance's Seed model family on **BytePlus ModelArk** (the international platform), and the **universal skill** (`SKILL.md`) that teaches Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI — or any tool that reads SKILL.md files — how to drive it.
 
-> **Status: v0.2.** The generation core is implemented: `video`, `tts`, `image`, and `qa` work end to end against the verified API shapes, with a fully offline test suite (fake BytePlus servers — 21 tests). A first live call (needs keys + billing) validates the remaining account-side facts. `voices`/`clone` subcommands are deliberately absent — cloned voices already work via `tts --voice S_<cloneId>`; slot ordering happens in the console.
+> **Status: v0.2.** The generation core is implemented: `video`, `tts`, `image`, and `qa` work end to end against the verified API shapes, with a fully offline test suite (fake BytePlus servers). `tts` is live-verified (2026-07-05), including `wav` output and native word timestamps; the Ark commands additionally need their models activated in the console (setup step below). `voices`/`clone` subcommands are deliberately absent — cloned voices already work via `tts --voice S_<cloneId>`; slot ordering happens in the console.
 
 ## Install — one command
 
@@ -42,7 +42,8 @@ Only making narration? You need just the voice key. Only generating clips and st
 
 1. Sign up at the [BytePlus console](https://console.byteplus.com) — self-serve for individuals (~195 countries, credit card, personal verification).
 2. Open **ModelArk** → **API keys** → create a key.
-3. `export ARK_API_KEY=…` (shell profile, direnv, or your secret manager).
+3. Activate each model you'll use (**ModelArk → Model Square**): the Seedance video models, Seedream for images, seed-1.8 for QA. An un-activated model fails with `ModelNotOpen` naming the exact model id.
+4. `export ARK_API_KEY=…` (shell profile, direnv, or your secret manager).
 
 **Getting `BYTEPLUS_VOICE_API_KEY`** (TTS / cloning):
 
@@ -68,12 +69,12 @@ seedloom video "a paper boat sails a rain gutter" [--image first.png] [--last-im
                [--ref a.png b.png] [--model standard|fast|mini] [--res 480p|720p|1080p|4k]
                [--dur 4-15] [--ratio 16:9] [--last-frame] [--no-audio] [--watermark] [--json]
 
-# Narration with stock or cloned voices; --words preserves native timestamps (TTS 1.0 voices)
+# Narration with stock or cloned voices; --words writes word timings (native on TTS 1.0/ICL voices)
 seedloom tts "Welcome back. Today we ship." [--voice en_male_tim_uranus_bigtts | S_<cloneId>]
              [--tone "warm, reassuring"] [--format mp3|wav] [--sample-rate 24000] [--words] [--json]
 
-seedloom image "isometric server room, dusk palette" [--size 2048x2048]   # Seedream still
-seedloom qa clip.mp4 "the prompt it came from"       # seed-1.8 watches the clip, reports mismatches
+seedloom image "isometric server room, dusk palette" [--model <id>] [--size 2048x2048] [--json]
+seedloom qa clip.mp4 "the prompt it came from" [--model <id>] [--json]   # seed-1.8 reviews the clip
 ```
 
 Setup & diagnostics (offline, free):
@@ -110,17 +111,17 @@ poll GET …/tasks/{id}     queued → running → succeeded
 download content.video_url  →  ./seedloom-runs/<run-id>/clip.mp4   (+ last_frame.png for chaining)
    │
    ▼
-result.json (model, seed, resolution, duration, cost tokens, paths)
+result.json (model, params, usage, local file paths)
 ```
 
-TTS is simpler still: one plain-JSON HTTP call, streamed base64 chunks concatenated to `narration.mp3|wav`, plus `narration.words.json` (word timestamps — native on TTS 1.0 voices, via Whisper transcription for the premium 2.0 voices).
+TTS is simpler still: one plain-JSON HTTP call, streamed base64 chunks concatenated to `narration.mp3|wav` — plus `narration.words.json` (flat `[{id,text,start,end}]`) with `--words` on TTS 1.0/ICL voices. 2.0 voices return no native timestamps; derive timing externally (e.g. `npx hyperframes transcribe`).
 
 ## Using the output with HyperFrames
 
 Seedloom produces exactly what a HyperFrames composition consumes — no adapter needed:
 
 - `clip.mp4` → a `<video>` layer (place as a direct child of the host root; the framework owns playback).
-- `narration.mp3|wav` → the voiceover track; `narration.words.json` (`[{id,text,start,end}]`) → captions/karaoke.
+- `narration.mp3|wav` → the voiceover track; `narration.words.json` (`[{id,text,start,end}]`, 1.0/ICL voices) → captions/karaoke.
 - `image.png` → stills, first frames for image-to-video, title cards.
 - `last_frame.png` → the first frame of the *next* clip, for visual continuity across shots.
 
@@ -129,7 +130,7 @@ Seedloom produces exactly what a HyperFrames composition consumes — no adapter
 - **Seedance 2.5 is not API-callable yet** — 2.0 (standard/fast/mini) is the newest callable version; swap via config when 2.5 lands.
 - **No real human faces** in reference images/video on the international endpoint (content policy). Generated/stylized characters are fine.
 - **Concurrency:** individual accounts run 3 video tasks at once (1 for 4K); ~2 QPS.
-- **Premium TTS 2.0 voices return no native word timestamps** — Seedloom derives them by transcription (same approach HyperFrames uses for ElevenLabs). TTS 1.0 emotional voices have native timestamps.
+- **Premium TTS 2.0 voices return no native word timestamps** — derive them externally (e.g. `npx hyperframes transcribe`, the same approach HyperFrames uses for ElevenLabs). TTS 1.0/ICL voices return them natively via `--words`.
 - **Costs are token-based for video**: a 5s 1080p clip ≈ $1.06 standard; draft on fast/mini, finalize on standard.
 
 ## Configuration

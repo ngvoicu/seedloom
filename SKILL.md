@@ -39,7 +39,7 @@ seedloom qa <clip.mp4> "<the prompt it was generated from>" [--model <id>] [--js
 Rules the CLI enforces (relay errors verbatim — they are actionable):
 - `--image/--last-image` (frame mode) and `--ref` (reference mode, max 9) are mutually exclusive.
 - Real human faces in reference media are rejected by the platform (moderation) — do not retry the same inputs.
-- `--words` yields native timestamps only on TTS 1.0 / ICL voices; for 2.0 voices the result notes to derive timing externally (e.g. `npx hyperframes transcribe`).
+- `--words` yields native timestamps only on TTS 1.0 / ICL voices (written as `narration.words.json`, flat `[{id,text,start,end}]`); for 2.0 voices the result notes to derive timing externally (e.g. `npx hyperframes transcribe`).
 - Generation costs real money: prefer `--model fast|mini` for drafts, `standard` for finals; use `seedloom qa` before human review.
 
 Setup & diagnostics (offline, free):
@@ -62,7 +62,7 @@ Prefer `--json` when you need to branch on the output; relay `doctor`'s fix-it h
 | `ARK_API_KEY` | BytePlus → ModelArk → API keys | Seedance video, Seedream images, LLM QA |
 | `BYTEPLUS_VOICE_API_KEY` | BytePlus → Seed Speech (activate; 20k-char free trial) | Seed TTS, voice cloning |
 
-Keys are set as environment variables by the user; `doctor` reports presence (masked) and never echoes them. Signup is self-serve for individuals (credit card, personal verification).
+Keys are set as environment variables by the user; `doctor` reports presence (masked) and never echoes them. Signup is self-serve for individuals (credit card, personal verification). Ark models must also be individually activated (console → ModelArk → Model Square); an un-activated model fails with `ModelNotOpen` naming the exact id — relay it and point the user at the console.
 
 ## Configuration
 
