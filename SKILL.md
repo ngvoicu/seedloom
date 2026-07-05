@@ -1,13 +1,13 @@
 ---
 name: seedloom
-description: Check and configure Seedloom — the BytePlus Seed-family media CLI (Seedance video, Seed TTS voices incl. cloning, Seedream images) that produces local files for HyperFrames and other video pipelines. Use when the user mentions seedloom, wants to verify BytePlus/ModelArk/Seed Speech credentials or model IDs for it, or asks what Seedloom can do. The generation surface (video/tts/image/qa/clone) is landing next — this skill currently covers setup, diagnostics, and configuration only; do not promise generation commands yet.
+description: Generate media with Seedloom — the BytePlus Seed-family CLI that turns Seedance video, Seed TTS voices (incl. cloned S_ voices), Seedream images, and seed-1.8 clip QA into local files for HyperFrames and other video pipelines. Use when the user wants to generate a video clip, narration/TTS audio, or a still image via BytePlus/Seedance/Seed models, QA a generated clip, or verify BytePlus credentials and model IDs. voices/clone-management subcommands do not exist yet — never invoke them.
 ---
 
 # Seedloom
 
 Seedloom turns BytePlus Seed-family models — **Seedance video, Seed TTS voices (incl. $2 voice cloning), Seedream images, seed-1.8 clip QA** — into **local media files** (`clip.mp4`, `narration.wav` + word-timestamps JSON, `image.png`) for coding agents and HyperFrames compositions.
 
-**Current surface (v0):** setup, diagnostics, and configuration. The generation commands (`video / tts / image / qa / clone`) are being built spec-first — never claim or attempt them until this skill documents them.
+**Surface:** generation (`video / tts / image / qa`) plus setup and diagnostics. Every generation run writes local artifacts and a `result.json` under `./seedloom-runs/<id>/` — local files are the deliverable (BytePlus URLs expire in ~24h; the CLI downloads on success, always). `voices` and `clone` subcommands do not exist — cloned voices are used directly via `tts --voice S_<cloneId>`; slot ordering happens in the BytePlus console.
 
 ## CLI resolution — works with zero install
 
@@ -23,6 +23,26 @@ $SEEDLOOM doctor
 - npx unavailable or the repo unreachable (offline) → ask the user to install from a clone: `npm install -g /path/to/seedloom`. Do not vendor, download by other means, or reimplement the CLI.
 
 ## Commands
+
+Generation (needs the matching key — see Credentials):
+
+```bash
+seedloom video "<prompt>" [--image first.png] [--last-image last.png] [--ref img …]
+               [--model standard|fast|mini] [--res 480p|720p|1080p|4k] [--dur 4-15]
+               [--ratio 16:9] [--last-frame] [--no-audio] [--watermark] [--json]
+seedloom tts "<text>" [--voice <id|S_cloneId>] [--tone "warm, reassuring"]
+               [--format mp3|wav] [--sample-rate 24000] [--words] [--json]
+seedloom image "<prompt>" [--model <id>] [--size 2048x2048] [--json]
+seedloom qa <clip.mp4> "<the prompt it was generated from>" [--model <id>] [--json]
+```
+
+Rules the CLI enforces (relay errors verbatim — they are actionable):
+- `--image/--last-image` (frame mode) and `--ref` (reference mode, max 9) are mutually exclusive.
+- Real human faces in reference media are rejected by the platform (moderation) — do not retry the same inputs.
+- `--words` yields native timestamps only on TTS 1.0 / ICL voices; for 2.0 voices the result notes to derive timing externally (e.g. `npx hyperframes transcribe`).
+- Generation costs real money: prefer `--model fast|mini` for drafts, `standard` for finals; use `seedloom qa` before human review.
+
+Setup & diagnostics (offline, free):
 
 ```bash
 seedloom status [--json]     # config home, credentials (masked), effective models
@@ -56,6 +76,7 @@ Model IDs live in config, never in code — BytePlus rotates date-suffixed build
 
 ## Invariants
 
-- **Never invoke generation commands that this skill does not document** — they don't exist yet; the CLI rejects them.
+- **Never invoke subcommands this skill does not document** (`voices`, `clone`, …) — they don't exist; the CLI rejects them.
 - **Never echo credential values**; `status`/`doctor` output is already masked — relay it as printed.
-- Runs are offline in v0 (`doctor` does not hit the network); a first live call after the generation core lands is what verifies account activation and quotas.
+- **The artifact is the local file path from `result.json`** — never a URL (they expire in ~24h).
+- `doctor` stays offline; the first live generation call is what verifies account activation, model access, and quotas — surface its errors verbatim rather than guessing.

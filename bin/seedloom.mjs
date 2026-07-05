@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 // seedloom — BytePlus Seed-family media generation (Seedance video, Seed TTS, Seedream images)
-// for coding agents. v0 surface: status | doctor | models | config | help. Generation commands
-// (video / tts / image / qa / clone) land with the spec'd API core; unbuilt commands are not
-// registered — no reachable stubs.
+// for coding agents. Surface: video | tts | image | qa | status | doctor | models | config | help.
+// voices/clone remain unregistered until they work end to end — no reachable stubs.
 import process from "node:process";
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { configHome, configPath, credentials, loadConfig, maskKey } from "../lib/config.js";
+import { runImage, runQa, runTts, runVideo } from "../lib/commands.js";
 
 async function main() {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
   const positional = args.filter((a) => !a.startsWith("--"));
   const command = positional[0] ?? "status";
+  const rest = args.slice(args.indexOf(command) + 1);
   switch (command) {
+    case "video":
+      return console.log(await runVideo(rest));
+    case "tts":
+      return console.log(await runTts(rest));
+    case "image":
+      return console.log(await runImage(rest));
+    case "qa":
+      return console.log(await runQa(rest));
     case "status":
       return console.log(await renderStatus(json));
     case "doctor":
@@ -129,7 +138,17 @@ function helpText() {
 BytePlus Seed-family media generation for coding agents:
 Seedance video, Seed TTS voices (incl. cloning), Seedream images, seed-1.8 clip QA.
 
-Commands (v0):
+Generation (each run writes local files + result.json under ./seedloom-runs/<id>/):
+
+  seedloom video "<prompt>" [--image first.png] [--last-image last.png] [--ref img …]
+                 [--model standard|fast|mini] [--res 480p|720p|1080p|4k] [--dur 4-15]
+                 [--ratio 16:9] [--last-frame] [--no-audio] [--watermark] [--json]
+  seedloom tts "<text>" [--voice <id|S_cloneId>] [--tone "warm, reassuring"]
+                 [--format mp3|wav] [--sample-rate 24000] [--words] [--json]
+  seedloom image "<prompt>" [--model <id>] [--size 2048x2048] [--json]
+  seedloom qa <clip.mp4> "<prompt it was generated from>" [--model <id>] [--json]
+
+Setup & diagnostics:
 
   seedloom status [--json]     config home, credentials (masked), effective models
   seedloom doctor              offline environment/credential checks with fix-it hints
@@ -137,12 +156,12 @@ Commands (v0):
   seedloom config show|path    effective config JSON / override file path
   seedloom help                this text
 
-Credentials (two independent BytePlus domains):
+Credentials (two independent BytePlus domains — set only what you use):
 
-  ARK_API_KEY               ModelArk — video, images, LLM
-  BYTEPLUS_VOICE_API_KEY    Seed Speech console — TTS, voice cloning
+  ARK_API_KEY               ModelArk — video, images, LLM QA
+  BYTEPLUS_VOICE_API_KEY    Seed Speech console — TTS (cloned voices work via tts --voice S_<id>)
 
-Generation commands (video / tts / image / qa / clone) are not built yet — see docs/ and the spec.`;
+voices/clone subcommands are not built yet (no verified catalog API; slot ordering = console).`;
 }
 
 // Run only when invoked as the CLI entry point, so tests can import the render helpers.

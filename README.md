@@ -8,7 +8,7 @@ Generate **video, voice, and images** from your coding agent — Seedance video 
 
 One repo, two surfaces: a **zero-dependency Node CLI** over ByteDance's Seed model family on **BytePlus ModelArk** (the international platform), and the **universal skill** (`SKILL.md`) that teaches Claude Code, Codex, Cursor, Windsurf, Cline, Gemini CLI — or any tool that reads SKILL.md files — how to drive it.
 
-> **Status: v0.** `seedloom status | doctor | models | config` work today, fully offline. The generation core (`video / tts / image / qa / clone`) is being built spec-first — sections below marked *(planned)* document that target surface.
+> **Status: v0.2.** The generation core is implemented: `video`, `tts`, `image`, and `qa` work end to end against the verified API shapes, with a fully offline test suite (fake BytePlus servers — 21 tests). A first live call (needs keys + billing) validates the remaining account-side facts. `voices`/`clone` subcommands are deliberately absent — cloned voices already work via `tts --voice S_<cloneId>`; slot ordering happens in the console.
 
 ## Install — one command
 
@@ -29,12 +29,12 @@ Not yet on npm; both forms pull from GitHub. Once published, they shorten to `np
 
 ## Set up your BytePlus keys
 
-**You need no keys today** — everything that ships in v0 runs offline. Keys matter when the generation commands land, and the two are **independent**: each unlocks its own feature family, so set up only what you'll use.
+Setup and diagnostics need **no keys**. Generation needs the key for its family, and the two are **independent** — set up only what you'll use.
 
 | Env var | Unlocks | Needed for | Free trial |
 |---|---|---|---|
-| `ARK_API_KEY` | Seedance **video**, Seedream **images**, seed-1.8 **clip QA** | `video`, `image`, `qa` *(planned)* | per-model token grants |
-| `BYTEPLUS_VOICE_API_KEY` | Seed **TTS**, **voice cloning** | `tts`, `clone` *(planned)* | 20k characters + 1 cloned voice |
+| `ARK_API_KEY` | Seedance **video**, Seedream **images**, seed-1.8 **clip QA** | `video`, `image`, `qa` | per-model token grants |
+| `BYTEPLUS_VOICE_API_KEY` | Seed **TTS**, **voice cloning** | `tts` (incl. `--voice S_<cloneId>`) | 20k characters + 1 cloned voice |
 
 Only making narration? You need just the voice key. Only generating clips and stills? Just the Ark key.
 
@@ -58,7 +58,25 @@ seedloom doctor      # checks node, config, and both keys — masked, with fix-i
 
 Keys are read from the environment only, never stored by Seedloom, and never echoed (`status`/`doctor` mask them).
 
-## Commands — working today
+## Commands
+
+Generation — each run writes local artifacts + `result.json` under `./seedloom-runs/<id>/`:
+
+```bash
+# Text-to-video, image-to-video (first frame / first+last), or reference-to-video (1-9 images)
+seedloom video "a paper boat sails a rain gutter" [--image first.png] [--last-image last.png]
+               [--ref a.png b.png] [--model standard|fast|mini] [--res 480p|720p|1080p|4k]
+               [--dur 4-15] [--ratio 16:9] [--last-frame] [--no-audio] [--watermark] [--json]
+
+# Narration with stock or cloned voices; --words preserves native timestamps (TTS 1.0 voices)
+seedloom tts "Welcome back. Today we ship." [--voice en_male_tim_uranus_bigtts | S_<cloneId>]
+             [--tone "warm, reassuring"] [--format mp3|wav] [--sample-rate 24000] [--words] [--json]
+
+seedloom image "isometric server room, dusk palette" [--size 2048x2048]   # Seedream still
+seedloom qa clip.mp4 "the prompt it came from"       # seed-1.8 watches the clip, reports mismatches
+```
+
+Setup & diagnostics (offline, free):
 
 ```bash
 seedloom status [--json]     # config home, credentials (masked), effective models
@@ -67,23 +85,7 @@ seedloom models [--json]     # effective model IDs and where they come from
 seedloom config show|path    # effective config JSON / override file location
 ```
 
-## Coming next *(planned — built spec-first, flags may still shift)*
-
-```bash
-# Text-to-video, image-to-video (first frame), or reference-to-video (1-9 images)
-seedloom video "a paper boat sails a rain gutter" [--image first.png] [--ref a.png b.png]
-               [--model standard|fast|mini] [--res 480p|720p|1080p|4k] [--dur 4-15]
-               [--last-frame]          # also saves last_frame.png for chaining clips
-
-# Narration with stock or cloned voices; words.json for captions
-seedloom tts "Welcome back. Today we ship." [--voice en_male_tim_uranus_bigtts | S_<cloneId>]
-             [--tone "warm, reassuring"] [--words] [--format mp3|wav]
-
-seedloom image "isometric server room, dusk palette"       # Seedream still (first frames, cards)
-seedloom voices [--lang en]                                # browse the ~500-voice catalog
-seedloom clone status|use                                  # cloned-voice lifecycle (ordering via console)
-seedloom qa clip.mp4 "the prompt it came from"             # seed-1.8 watches the clip, reports mismatches
-```
+Deliberately not built: `voices` (no verified catalog API — browse the official voice list docs) and `clone` slot management (console UI; AK/SK-signed API deferred). Cloned voices work today via `tts --voice S_<cloneId>`.
 
 ## Why Seedloom (and not an existing tool)
 

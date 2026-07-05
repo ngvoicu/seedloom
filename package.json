@@ -1,6 +1,6 @@
 {
   "name": "seedloom",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "BytePlus Seed-family media generation for coding agents: Seedance video, Seed TTS voices (incl. cloning), Seedream images, seed-1.8 clip QA. Zero-dependency Node CLI + universal skill.",
   "type": "module",

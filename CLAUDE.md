@@ -14,14 +14,19 @@ This guide is kept **byte-identical** in `AGENTS.md` and `CLAUDE.md` (a parity t
 
 - `bin/seedloom.mjs` — CLI entry and command rendering. Thin; logic lives in `lib/`.
 - `lib/config.js` — config home (`SEEDLOOM_HOME` || `~/.seedloom`), `DEFAULT_CONFIG` (endpoints + model IDs), deep-merge overrides from `config.json`, credentials, key masking.
+- `lib/http.js` — fetch helpers (loud errors carrying response bodies; no blind retries — generation bills money) + download-to-disk.
+- `lib/ark.js` — ModelArk client: Seedance task submit/poll, Seedream images, seed-1.8 clip QA; local images/clips inlined as base64 data URLs.
+- `lib/voice.js` — Seed Speech HTTP unidirectional TTS: streamed JSON-chunk parsing, base64 concat, pcm→wav wrapping, resource-id routing (S_ voices → ICL).
+- `lib/commands.js` — generation command handlers + flag parsing; progress on stderr, summary/JSON on stdout.
+- `lib/runs.js` — `./seedloom-runs/<id>/` run dirs + `result.json` (override root via `SEEDLOOM_RUNS_DIR`).
 - `SKILL.md` — the canonical universal skill (root). The only teaching artifact.
 - `skills/seedloom/SKILL.md` — **symlink** to `../../SKILL.md` for tools that discover skills under `skills/<name>/`. Never replace it with a copy in this repo (Windsurf users copy it locally on install — their side).
-- `tests/core.test.mjs` — `node --test`; spawns the CLI against a temp `SEEDLOOM_HOME` with credential env vars stripped; includes the AGENTS/CLAUDE parity test.
+- `tests/core.test.mjs` + `tests/generation.test.mjs` — `node --test`; spawn the CLI against a temp `SEEDLOOM_HOME` with credential env vars stripped; generation tests run local fake BytePlus servers and assert our request shapes; includes the AGENTS/CLAUDE parity test.
 - `docs/` — the research and distribution reports (living references; update them when API reality drifts).
 
 ## Skill rules (engine and skill live at the same commit — keep them in lockstep)
 
-- **When a new CLI capability lands, widen `SKILL.md` in the same commit.** The skill documents only what the CLI actually ships — no planned/stub surface; v0 covers `status | doctor | models | config` and explicitly forbids invoking generation commands until they land.
+- **When a new CLI capability lands, widen `SKILL.md` in the same commit.** The skill documents only what the CLI actually ships — no planned/stub surface; today that is `video | tts | image | qa` plus setup/diagnostics, and it explicitly forbids `voices`/`clone` until they exist.
 - **The skill never bundles the CLI.** The installed skill file resolves `seedloom` from PATH, else runs it zero-install via `npx -y github:ngvoicu/seedloom`; it degrades to an install hint only when npx cannot reach the repo. No vendoring, no reimplementation — the Kluris discipline.
 - **Skill `description` is the trigger** — keep it accurate about what exists; a description that promises generation before the CLI ships it sends agents into dead ends.
 - Never echo credentials in skill instructions or examples; the CLI masks them.
@@ -36,7 +41,9 @@ This guide is kept **byte-identical** in `AGENTS.md` and `CLAUDE.md` (a parity t
   node bin/seedloom.mjs doctor               # offline env/credential checks
   ```
 - **Tests never call live BytePlus APIs** (real calls bill real money): temp `SEEDLOOM_HOME`, credential env stripped, and — once the API core lands — local fake HTTP servers. The ConsensFlow discipline.
-- **No reachable stubs.** v0 ships `status | doctor | models | config` (plus `help`) and nothing else; a command is not registered until it works end to end.
+- **No reachable stubs.** The surface is `video | tts | image | qa | status | doctor | models | config` (plus `help`); `voices`/`clone` stay unregistered until they work end to end.
+- **Tests spawn the CLI asynchronously** (`spawn`, never `spawnSync`) when fake servers live in the test process — a blocking spawn freezes the event loop the fakes answer from and deadlocks the suite.
+- Three medium-confidence API details are flagged "verify live" in code comments (video param placement, the QA video content part, the TTS timestamp schema) — confirm them on the first billed call and delete the comments.
 - The bin's main-module guard realpaths `process.argv[1]` — global npm installs invoke it through a symlink; don't "simplify" that check back to a plain equality.
 
 ## Conventions (enforced)
